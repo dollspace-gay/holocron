@@ -6,6 +6,7 @@ This module provides the Typer-based CLI for Holocron, including:
 - review: Spaced repetition review session
 - learner: Learner profile management
 - domains: List available domains
+- lessons: List available built-in lessons
 - gui: Launch the web GUI
 """
 
@@ -107,6 +108,108 @@ def list_domains() -> None:
         )
 
     console.print(table)
+
+
+# =============================================================================
+# Lessons Command
+# =============================================================================
+
+
+@app.command("lessons")
+def list_lessons(
+    domain: Optional[str] = typer.Option(
+        None, "--domain", "-d", help="Filter by domain"
+    ),
+    category: Optional[str] = typer.Option(
+        None, "--category", "-c", help="Filter by category (fundamentals, intermediate, advanced)"
+    ),
+) -> None:
+    """List available lessons.
+
+    Shows built-in lessons organized by domain and category.
+    Use --domain to filter by a specific domain.
+    """
+    from holocron.content import LessonLoader, LessonCategory
+
+    # Ensure lessons are loaded
+    import holocron.content.python_lessons  # noqa: F401
+    import holocron.content.reading_lessons  # noqa: F401
+
+    domains = LessonLoader.list_domains_with_lessons()
+
+    if not domains:
+        console.print("[yellow]No lessons available.[/yellow]")
+        return
+
+    if domain and domain not in domains:
+        console.print(f"[red]No lessons found for domain: {domain}[/red]")
+        console.print(f"Available domains: {', '.join(domains)}")
+        return
+
+    # Filter domains if specified
+    if domain:
+        domains = [domain]
+
+    # Parse category filter
+    category_filter = None
+    if category:
+        try:
+            category_filter = LessonCategory(category.lower())
+        except ValueError:
+            valid = ", ".join(c.value for c in LessonCategory)
+            console.print(f"[red]Invalid category: {category}[/red]")
+            console.print(f"Valid categories: {valid}")
+            raise typer.Exit(1)
+
+    total_lessons = 0
+
+    for domain_id in domains:
+        lessons = LessonLoader.get_lessons(domain_id)
+
+        # Apply category filter
+        if category_filter:
+            lessons = [l for l in lessons if l.category == category_filter]
+
+        if not lessons:
+            continue
+
+        # Get domain display name
+        try:
+            adapter = DomainRegistry.get(domain_id)
+            domain_name = adapter.config.display_name
+        except KeyError:
+            domain_name = domain_id.replace("-", " ").title()
+
+        console.print()
+        console.print(f"[bold cyan]{domain_name}[/bold cyan] ({domain_id})")
+        console.print()
+
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Lesson ID", style="dim")
+        table.add_column("Title", style="green")
+        table.add_column("Category")
+        table.add_column("Difficulty", justify="center")
+        table.add_column("Time", justify="right")
+
+        # Sort by category then difficulty
+        lessons.sort(key=lambda l: (l.category.value, l.difficulty))
+
+        for lesson in lessons:
+            diff_bar = "#" * lesson.difficulty + "-" * (10 - lesson.difficulty)
+            table.add_row(
+                lesson.lesson_id,
+                lesson.title,
+                lesson.category.value,
+                diff_bar,
+                f"{lesson.estimated_minutes} min",
+            )
+            total_lessons += 1
+
+        console.print(table)
+
+    console.print()
+    console.print(f"[dim]Total: {total_lessons} lessons[/dim]")
+    console.print("[dim]Start the GUI to view lesson content: holocron gui[/dim]")
 
 
 # =============================================================================

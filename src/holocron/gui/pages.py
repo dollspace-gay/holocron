@@ -7,6 +7,7 @@ Only import this module when running in web (non-native) mode.
 from nicegui import ui
 
 from holocron.config import get_settings
+from holocron.content import LessonLoader, LessonCategory
 from holocron.domains.registry import DomainRegistry
 
 
@@ -29,6 +30,7 @@ def register_pages(state, ui_module=None):
 
             with ui.row().classes("gap-2"):
                 ui.button("Dashboard", on_click=lambda: ui.navigate.to("/")).props("flat")
+                ui.button("Lessons", on_click=lambda: ui.navigate.to("/lessons")).props("flat")
                 ui.button("Study", on_click=lambda: ui.navigate.to("/study")).props("flat")
                 ui.button("Review", on_click=lambda: ui.navigate.to("/review")).props("flat")
                 ui.button("Settings", on_click=lambda: ui.navigate.to("/settings")).props("flat")
@@ -256,5 +258,117 @@ def register_pages(state, ui_module=None):
                         with ui.row().classes("items-center gap-2"):
                             ui.icon("folder", color="primary")
                             ui.label(adapter.config.display_name).classes("font-semibold")
+
+        create_footer()
+
+    @ui.page("/lessons")
+    async def lessons_page():
+        """Lesson browser page."""
+        create_header()
+
+        learner = await state.get_learner("default")
+        state.current_learner = learner
+
+        with ui.column().classes("w-full max-w-6xl mx-auto p-6 gap-6"):
+            ui.label("Lessons").classes("text-2xl font-bold")
+            ui.label("Choose a lesson to start learning").classes("text-gray-600")
+
+            # Get all domains with lessons
+            domains = LessonLoader.list_domains_with_lessons()
+
+            for domain_id in domains:
+                lessons = LessonLoader.get_lessons(domain_id)
+                if not lessons:
+                    continue
+
+                # Get domain display name
+                try:
+                    adapter = DomainRegistry.get(domain_id)
+                    domain_name = adapter.config.display_name
+                except KeyError:
+                    domain_name = domain_id.replace("-", " ").title()
+
+                with ui.expansion(f"{domain_name} ({len(lessons)} lessons)", icon="folder").classes("w-full"):
+                    # Group by category
+                    categories = {}
+                    for lesson in lessons:
+                        cat = lesson.category.value
+                        if cat not in categories:
+                            categories[cat] = []
+                        categories[cat].append(lesson)
+
+                    for category, cat_lessons in sorted(categories.items()):
+                        ui.label(category.title()).classes("font-semibold text-lg mt-4 mb-2")
+
+                        for lesson in sorted(cat_lessons, key=lambda x: x.difficulty):
+                            with ui.card().classes("w-full mb-2 cursor-pointer hover:bg-gray-50").on(
+                                "click", lambda l=lesson: ui.navigate.to(f"/lesson/{l.domain_id}/{l.lesson_id}")
+                            ):
+                                with ui.row().classes("items-center justify-between p-4"):
+                                    with ui.column().classes("gap-1"):
+                                        ui.label(lesson.title).classes("font-semibold text-lg")
+                                        ui.label(lesson.description).classes("text-gray-600 text-sm")
+                                        with ui.row().classes("gap-2 mt-1"):
+                                            ui.badge(f"~{lesson.estimated_minutes} min").props("outline")
+                                            ui.badge(f"Difficulty: {lesson.difficulty}/10").props("outline")
+                                            for tag in lesson.tags[:3]:
+                                                ui.badge(tag, color="primary").props("outline")
+                                    ui.icon("chevron_right", size="lg", color="gray")
+
+        create_footer()
+
+    @ui.page("/lesson/{domain_id}/{lesson_id}")
+    async def lesson_detail_page(domain_id: str, lesson_id: str):
+        """Individual lesson page."""
+        create_header()
+
+        learner = await state.get_learner("default")
+        state.current_learner = learner
+
+        lesson = LessonLoader.get_lesson(domain_id, lesson_id)
+
+        with ui.column().classes("w-full max-w-4xl mx-auto p-6 gap-6"):
+            if not lesson:
+                ui.label("Lesson not found").classes("text-2xl font-bold text-red-600")
+                ui.button("Back to Lessons", on_click=lambda: ui.navigate.to("/lessons")).props("color=primary")
+            else:
+                # Lesson header
+                with ui.row().classes("items-center gap-4 mb-4"):
+                    ui.button(icon="arrow_back", on_click=lambda: ui.navigate.to("/lessons")).props("flat round")
+                    with ui.column().classes("gap-1"):
+                        ui.label(lesson.title).classes("text-2xl font-bold")
+                        ui.label(lesson.description).classes("text-gray-600")
+
+                # Lesson metadata
+                with ui.row().classes("gap-2 mb-4"):
+                    ui.badge(f"~{lesson.estimated_minutes} min", color="primary")
+                    ui.badge(f"Difficulty: {lesson.difficulty}/10", color="secondary")
+                    ui.badge(lesson.category.value.title(), color="accent")
+
+                # Lesson content
+                with ui.card().classes("w-full"):
+                    with ui.column().classes("p-6"):
+                        ui.markdown(lesson.content).classes("prose prose-lg max-w-none")
+
+                # Study button
+                async def study_lesson():
+                    from holocron.core.transformer import ContentTransformer, TransformConfig
+
+                    transformer = ContentTransformer(domain_id=domain_id, learner=learner)
+                    result = transformer.transform(lesson.content, TransformConfig(include_assessments=True))
+
+                    await state.save_learner()
+                    ui.notify(f"Studied {len(result.concepts_found)} concepts from this lesson!", type="positive")
+
+                with ui.row().classes("gap-4 mt-4"):
+                    ui.button("Mark as Studied", icon="check", on_click=study_lesson).props("color=primary size=lg")
+
+                    if lesson.prerequisites:
+                        with ui.column().classes("mt-4"):
+                            ui.label("Prerequisites:").classes("font-semibold")
+                            for prereq_id in lesson.prerequisites:
+                                prereq = LessonLoader.get_lesson(domain_id, prereq_id)
+                                if prereq:
+                                    ui.link(prereq.title, f"/lesson/{domain_id}/{prereq_id}").classes("text-primary")
 
         create_footer()

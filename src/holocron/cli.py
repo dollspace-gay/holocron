@@ -621,13 +621,22 @@ def gui(
     Opens a modern web UI with dashboard, study mode, review mode,
     and progress analytics.
     """
-    from holocron.gui import run_gui
-
     console.print(f"[green]Starting Holocron GUI on http://{host}:{port}[/green]")
-    if native:
-        console.print("[dim]Running in native desktop mode[/dim]")
 
-    run_gui(host=host, port=port, reload=reload, native=native)
+    if native:
+        # Native mode requires running via a dedicated launcher script
+        # to avoid NiceGUI script re-execution issues with entry points
+        import subprocess
+        import sys
+
+        console.print("[dim]Running in native desktop mode[/dim]")
+        subprocess.run([
+            sys.executable, "-m", "holocron.gui.native_launcher",
+            "--host", host, "--port", str(port)
+        ])
+    else:
+        from holocron.gui import run_gui
+        run_gui(host=host, port=port, reload=reload, native=False)
 
 
 # =============================================================================

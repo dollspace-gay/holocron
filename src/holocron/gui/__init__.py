@@ -6,6 +6,6 @@ This package provides a modern web interface for Holocron:
 - components: Reusable UI components
 """
 
-from holocron.gui.app import create_app, run_gui
+from holocron.gui.app import run_gui
 
-__all__ = ["create_app", "run_gui"]
+__all__ = ["run_gui"]

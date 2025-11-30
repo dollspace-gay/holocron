@@ -20,7 +20,11 @@
       "Bash(holocron transform:*)",
       "Bash(bd stats:*)",
       "Bash(bd sync:*)",
-      "Bash(holocron learner:*)"
+      "Bash(holocron learner:*)",
+      "Bash(timeout 10 python:*)",
+      "Bash(timeout 15 holocron gui:*)",
+      "Bash(timeout 15 python:*)",
+      "Bash(timeout 20 python:*)"
     ],
     "deny": [],
     "ask": []

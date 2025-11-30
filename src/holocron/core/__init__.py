@@ -11,6 +11,12 @@ This package contains the fundamental abstractions:
 
 from holocron.core.mastery import MasteryEngine, MasteryModel, MasteryUpdate
 from holocron.core.transformer import ContentTransformer, TransformConfig, TransformResult
+from holocron.core.grader import AssessmentGrader, GradingResult, grade_response
+from holocron.core.pedagogy import (
+    PedagogicalTechnique,
+    PedagogicalTransformer,
+    TechniqueResult,
+)
 from holocron.core.models import (
     Assessment,
     AssessmentOption,
@@ -46,4 +52,12 @@ __all__ = [
     "ContentTransformer",
     "TransformConfig",
     "TransformResult",
+    # Grader
+    "AssessmentGrader",
+    "GradingResult",
+    "grade_response",
+    # Pedagogy
+    "PedagogicalTechnique",
+    "PedagogicalTransformer",
+    "TechniqueResult",
 ]

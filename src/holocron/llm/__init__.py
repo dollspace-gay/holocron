@@ -5,4 +5,6 @@ This package provides LLM client and text chunking:
 - chunker: Document chunking for token limits
 """
 
-# Components will be imported here once implemented
+from holocron.llm.client import LLMClient, LLMResponse, quick_complete
+
+__all__ = ["LLMClient", "LLMResponse", "quick_complete"]

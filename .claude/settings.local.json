@@ -19,7 +19,8 @@
       "Bash(holocron analyze:*)",
       "Bash(holocron transform:*)",
       "Bash(bd stats:*)",
-      "Bash(bd sync:*)"
+      "Bash(bd sync:*)",
+      "Bash(holocron learner:*)"
     ],
     "deny": [],
     "ask": []

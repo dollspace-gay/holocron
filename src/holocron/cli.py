@@ -9,6 +9,7 @@ This module provides the Typer-based CLI for Holocron, including:
 - gui: Launch the web GUI
 """
 
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -25,9 +26,20 @@ from holocron.config import get_settings
 from holocron.core.models import BloomLevel, LearnerProfile
 from holocron.core.transformer import ContentTransformer, TransformConfig
 from holocron.domains.registry import DomainRegistry
+from holocron.learner import Database, LearnerRepository, get_default_db_path
 
 # Ensure domains are loaded
 import holocron.domains  # noqa: F401
+
+
+def run_async(coro):
+    """Run an async coroutine in a sync context."""
+    return asyncio.get_event_loop().run_until_complete(coro)
+
+
+def get_db() -> Database:
+    """Get the default database instance."""
+    return Database(get_default_db_path())
 
 app = typer.Typer(
     name="holocron",
@@ -344,7 +356,7 @@ def analyze(
 
 @app.command("learn")
 def learn(
-    domain: str = typer.Option(..., "--domain", "-d", help="Skill domain to study"),
+    domain: str = typer.Option("reading-skills", "--domain", "-d", help="Skill domain to study"),
     learner_name: str = typer.Option("default", "--learner", "-l", help="Learner profile name"),
 ) -> None:
     """Start an interactive learning session.
@@ -352,11 +364,16 @@ def learn(
     Enter a REPL-like environment where you study concepts,
     answer assessments, and track your progress in real-time.
     """
-    console.print(f"[yellow]Interactive learn mode not yet implemented.[/yellow]")
-    console.print(f"Domain: {domain}")
-    console.print(f"Learner: {learner_name}")
-    console.print()
-    console.print("[dim]This will provide a REPL-like learning experience.[/dim]")
+    # Validate domain
+    if not DomainRegistry.is_registered(domain):
+        available = ", ".join(DomainRegistry.list_domains())
+        console.print(f"[red]Unknown domain: {domain}[/red]")
+        console.print(f"Available domains: {available}")
+        raise typer.Exit(1)
+
+    from holocron.repl import start_session
+
+    run_async(start_session(learner_id=learner_name, domain_id=domain))
 
 
 # =============================================================================
@@ -367,20 +384,50 @@ def learn(
 @app.command("review")
 def review(
     learner_name: str = typer.Option("default", "--learner", "-l", help="Learner profile name"),
-    domain: Optional[str] = typer.Option(
-        None, "--domain", "-d", help="Filter by domain"
+    domain: str = typer.Option(
+        "reading-skills", "--domain", "-d", help="Domain to review"
     ),
 ) -> None:
     """Start a spaced repetition review session.
 
     Reviews concepts that are due based on the SM-2 algorithm.
     """
-    console.print(f"[yellow]Spaced repetition review not yet implemented.[/yellow]")
-    console.print(f"Learner: {learner_name}")
-    if domain:
-        console.print(f"Domain: {domain}")
-    console.print()
-    console.print("[dim]This will review concepts due for spaced repetition.[/dim]")
+    # Validate domain
+    if not DomainRegistry.is_registered(domain):
+        available = ", ".join(DomainRegistry.list_domains())
+        console.print(f"[red]Unknown domain: {domain}[/red]")
+        console.print(f"Available domains: {available}")
+        raise typer.Exit(1)
+
+    async def run_review():
+        db = get_db()
+        repo = LearnerRepository(db)
+        await db.initialize()
+
+        # Check for due concepts
+        due = await repo.get_concepts_due_for_review(learner_name, domain)
+
+        if not due:
+            console.print("[green]No concepts due for review![/green]")
+            console.print("[dim]Use 'holocron learn' to study new content.[/dim]")
+            return
+
+        console.print(f"[yellow]{len(due)} concepts due for review[/yellow]")
+        console.print()
+
+        # Start interactive review session
+        from holocron.repl import SessionController
+
+        controller = SessionController(
+            learner_id=learner_name,
+            domain_id=domain,
+            db=db,
+        )
+        await controller.initialize()
+        await controller._cmd_review([])  # Trigger review mode
+        await controller.run()
+
+    run_async(run_review())
 
 
 # =============================================================================
@@ -394,40 +441,163 @@ app.add_typer(learner_app, name="learner")
 @learner_app.command("create")
 def learner_create(
     name: str = typer.Argument(..., help="Name for the new learner profile"),
+    learner_id: Optional[str] = typer.Option(
+        None, "--id", help="Custom learner ID (defaults to slugified name)"
+    ),
 ) -> None:
     """Create a new learner profile."""
-    console.print(f"[yellow]Learner creation not yet implemented (requires persistence).[/yellow]")
-    console.print(f"Would create learner: {name}")
+    import re
+
+    # Generate ID from name if not provided
+    if learner_id is None:
+        learner_id = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+    async def create():
+        db = get_db()
+        repo = LearnerRepository(db)
+
+        # Check if exists
+        if await repo.exists(learner_id):
+            console.print(f"[red]Learner '{learner_id}' already exists.[/red]")
+            raise typer.Exit(1)
+
+        # Create profile
+        profile = LearnerProfile(learner_id=learner_id, name=name)
+        await repo.save(profile)
+
+        console.print(f"[green]Created learner profile:[/green]")
+        console.print(f"  ID: {learner_id}")
+        console.print(f"  Name: {name}")
+
+    run_async(create())
 
 
 @learner_app.command("list")
 def learner_list() -> None:
     """List all learner profiles."""
-    console.print(f"[yellow]Learner listing not yet implemented (requires persistence).[/yellow]")
+
+    async def list_learners():
+        db = get_db()
+        repo = LearnerRepository(db)
+        profiles = await repo.list_all()
+
+        if not profiles:
+            console.print("[yellow]No learner profiles found.[/yellow]")
+            console.print("Create one with: holocron learner create <name>")
+            return
+
+        table = Table(title="Learner Profiles")
+        table.add_column("ID", style="cyan")
+        table.add_column("Name", style="green")
+        table.add_column("Created", style="dim")
+        table.add_column("Study Time", justify="right")
+        table.add_column("Streak", justify="right")
+
+        for profile in profiles:
+            created = profile.created_at.strftime("%Y-%m-%d")
+            study_time = f"{profile.total_study_time_minutes} min"
+            streak = f"{profile.current_streak_days} days"
+            table.add_row(
+                profile.learner_id,
+                profile.name,
+                created,
+                study_time,
+                streak,
+            )
+
+        console.print(table)
+
+    run_async(list_learners())
 
 
 @learner_app.command("stats")
 def learner_stats(
-    name: str = typer.Argument(..., help="Learner profile name"),
+    learner_id: str = typer.Argument(..., help="Learner profile ID"),
 ) -> None:
     """Show statistics for a learner."""
-    console.print(f"[yellow]Learner stats not yet implemented (requires persistence).[/yellow]")
-    console.print(f"Learner: {name}")
+
+    async def show_stats():
+        db = get_db()
+        repo = LearnerRepository(db)
+
+        stats = await repo.get_learner_stats(learner_id)
+        if not stats:
+            console.print(f"[red]Learner '{learner_id}' not found.[/red]")
+            raise typer.Exit(1)
+
+        console.print()
+        console.print(
+            Panel(
+                f"[bold]Name:[/bold] {stats['name']}\n"
+                f"[bold]Study Time:[/bold] {stats['total_study_time_minutes']} minutes\n"
+                f"[bold]Current Streak:[/bold] {stats['current_streak_days']} days\n"
+                f"[bold]Concepts Mastered:[/bold] {stats['concepts_mastered']}",
+                title=f"Learner: {learner_id}",
+                border_style="cyan",
+            )
+        )
+
+        # Domain breakdown
+        if stats["domains"]:
+            console.print()
+            table = Table(title="Domain Progress")
+            table.add_column("Domain", style="cyan")
+            table.add_column("Concepts", justify="right")
+            table.add_column("Avg Mastery", justify="right")
+
+            for domain_id, domain_stats in stats["domains"].items():
+                table.add_row(
+                    domain_id,
+                    str(domain_stats["concept_count"]),
+                    f"{domain_stats['avg_mastery']}%",
+                )
+            console.print(table)
+
+        # Assessment stats
+        console.print()
+        console.print(
+            Panel(
+                f"[bold]Total Assessments:[/bold] {stats['total_assessments']}\n"
+                f"[bold]Correct:[/bold] {stats['correct_assessments']}\n"
+                f"[bold]Accuracy:[/bold] {stats['accuracy']}%\n"
+                f"[bold]Due for Review:[/bold] {stats['concepts_due_for_review']}",
+                title="Assessment Stats",
+                border_style="green",
+            )
+        )
+
+    run_async(show_stats())
 
 
 @learner_app.command("delete")
 def learner_delete(
-    name: str = typer.Argument(..., help="Learner profile name to delete"),
+    learner_id: str = typer.Argument(..., help="Learner profile ID to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ) -> None:
     """Delete a learner profile."""
-    if not force:
-        confirm = typer.confirm(f"Are you sure you want to delete learner '{name}'?")
-        if not confirm:
-            console.print("[yellow]Cancelled.[/yellow]")
-            raise typer.Exit()
 
-    console.print(f"[yellow]Learner deletion not yet implemented (requires persistence).[/yellow]")
+    async def delete():
+        db = get_db()
+        repo = LearnerRepository(db)
+
+        # Check if exists
+        if not await repo.exists(learner_id):
+            console.print(f"[red]Learner '{learner_id}' not found.[/red]")
+            raise typer.Exit(1)
+
+        if not force:
+            confirm = typer.confirm(f"Are you sure you want to delete learner '{learner_id}'?")
+            if not confirm:
+                console.print("[yellow]Cancelled.[/yellow]")
+                raise typer.Exit()
+
+        deleted = await repo.delete(learner_id)
+        if deleted:
+            console.print(f"[green]Deleted learner '{learner_id}'.[/green]")
+        else:
+            console.print(f"[red]Failed to delete learner '{learner_id}'.[/red]")
+
+    run_async(delete())
 
 
 # =============================================================================
@@ -438,6 +608,7 @@ def learner_delete(
 @app.command("gui")
 def gui(
     port: int = typer.Option(8080, "--port", "-p", help="Port to run on"),
+    host: str = typer.Option("127.0.0.1", "--host", "-H", help="Host to bind to"),
     native: bool = typer.Option(
         False, "--native", help="Run as native desktop app"
     ),
@@ -450,10 +621,13 @@ def gui(
     Opens a modern web UI with dashboard, study mode, review mode,
     and progress analytics.
     """
-    console.print(f"[yellow]GUI not yet implemented.[/yellow]")
-    console.print(f"Would launch on port {port}")
+    from holocron.gui import run_gui
+
+    console.print(f"[green]Starting Holocron GUI on http://{host}:{port}[/green]")
     if native:
-        console.print("Would run in native mode (pywebview)")
+        console.print("[dim]Running in native desktop mode[/dim]")
+
+    run_gui(host=host, port=port, reload=reload, native=native)
 
 
 # =============================================================================

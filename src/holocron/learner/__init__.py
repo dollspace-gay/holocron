@@ -6,4 +6,14 @@ This package handles learner profiles and persistence:
 - session: Learning session tracking
 """
 
-# Components will be imported here once implemented
+from holocron.learner.database import (
+    Database,
+    LearnerRepository,
+    get_default_db_path,
+)
+
+__all__ = [
+    "Database",
+    "LearnerRepository",
+    "get_default_db_path",
+]

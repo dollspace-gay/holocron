@@ -1,9 +1,20 @@
 """Interactive REPL for Holocron.
 
-This package provides the interactive learning mode:
-- session: Interactive session controller
-- renderer: Rich console rendering
-- commands: REPL commands (/help, /stats, /review, etc.)
+This package provides the interactive learning environment:
+- session: SessionController for managing learning sessions
+- start_session: Quick function to launch interactive mode
 """
 
-# Components will be imported here once implemented
+from holocron.repl.session import (
+    SessionController,
+    SessionState,
+    SessionStats,
+    start_session,
+)
+
+__all__ = [
+    "SessionController",
+    "SessionState",
+    "SessionStats",
+    "start_session",
+]

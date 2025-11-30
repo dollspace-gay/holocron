@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone:*)",
+      "Bash(bd init:*)",
+      "Bash(bd doctor --fix)",
+      "Bash(bd create:*)",
+      "Bash(bd dep:*)",
+      "Bash(bd list:*)",
+      "Bash(bd ready:*)",
+      "Bash(bd update:*)",
+      "Bash(pip install:*)",
+      "Bash(python -c:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(holocron --help:*)",
+      "Bash(bd close:*)",
+      "Bash(bd show:*)",
+      "Bash(holocron domains:*)",
+      "Bash(holocron analyze:*)",
+      "Bash(holocron transform:*)",
+      "Bash(bd stats:*)",
+      "Bash(bd sync:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

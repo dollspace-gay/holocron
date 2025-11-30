@@ -1,0 +1,102 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "holocron"
+version = "0.1.0"
+description = "A generalized skill training platform using evidence-based pedagogical techniques"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Holocron Team" }
+]
+keywords = [
+    "education",
+    "learning",
+    "spaced-repetition",
+    "skill-training",
+    "pedagogy",
+    "bloom-taxonomy",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Education",
+]
+dependencies = [
+    # LLM Support
+    "litellm>=1.0",
+    "tenacity>=8.0",
+    "tiktoken>=0.5",
+
+    # Configuration
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "python-dotenv>=1.0",
+
+    # CLI
+    "typer>=0.9",
+    "rich>=13.0",
+
+    # Document formats
+    "pdfplumber>=0.10",
+    "reportlab>=4.0",
+    "python-docx>=1.0",
+    "ebooklib>=0.18",
+    "odfpy>=1.4",
+    "striprtf>=0.0.26",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+
+    # New for Holocron
+    "nicegui>=1.4",
+    "plotly>=5.0",
+    "aiosqlite>=0.19",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+native = ["pywebview>=4.0"]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+]
+
+[project.scripts]
+holocron = "holocron.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/holocron/holocron"
+Documentation = "https://github.com/holocron/holocron#readme"
+Repository = "https://github.com/holocron/holocron"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

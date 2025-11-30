@@ -1,0 +1,2 @@
+[console_scripts]
+holocron = holocron.cli:app

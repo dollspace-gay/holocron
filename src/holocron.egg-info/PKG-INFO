@@ -1,0 +1,47 @@
+Metadata-Version: 2.4
+Name: holocron
+Version: 0.1.0
+Summary: A generalized skill training platform using evidence-based pedagogical techniques
+Author: Holocron Team
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/holocron/holocron
+Project-URL: Documentation, https://github.com/holocron/holocron#readme
+Project-URL: Repository, https://github.com/holocron/holocron
+Keywords: education,learning,spaced-repetition,skill-training,pedagogy,bloom-taxonomy
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Education
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Education
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: litellm>=1.0
+Requires-Dist: tenacity>=8.0
+Requires-Dist: tiktoken>=0.5
+Requires-Dist: pydantic>=2.0
+Requires-Dist: pydantic-settings>=2.0
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: typer>=0.9
+Requires-Dist: rich>=13.0
+Requires-Dist: pdfplumber>=0.10
+Requires-Dist: reportlab>=4.0
+Requires-Dist: python-docx>=1.0
+Requires-Dist: ebooklib>=0.18
+Requires-Dist: odfpy>=1.4
+Requires-Dist: striprtf>=0.0.26
+Requires-Dist: beautifulsoup4>=4.12
+Requires-Dist: lxml>=5.0
+Requires-Dist: nicegui>=1.4
+Requires-Dist: plotly>=5.0
+Requires-Dist: aiosqlite>=0.19
+Requires-Dist: pyyaml>=6.0
+Provides-Extra: native
+Requires-Dist: pywebview>=4.0; extra == "native"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: black>=23.0; extra == "dev"
+Requires-Dist: ruff>=0.1; extra == "dev"
+Requires-Dist: mypy>=1.0; extra == "dev"
